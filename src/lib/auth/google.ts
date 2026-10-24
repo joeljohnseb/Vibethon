@@ -4,16 +4,16 @@ import { config } from "@/lib/config";
 import { randomToken } from "@/lib/codes";
 
 export const GOOGLE_STATE_COOKIE = "eber_g_state";
-export const redirectUri = () => `${config.appUrl}/auth/google/callback`;
+export const redirectUri = (baseUrl?: string) => `${baseUrl ? baseUrl.replace(/\/$/, "") : config.appUrl}/auth/google/callback`;
 
-export function createGoogleAuthRequest() {
+export function createGoogleAuthRequest(baseUrl?: string) {
   const state = randomToken(24);
   const verifier = randomToken(48);
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.search = new URLSearchParams({
     client_id: config.google.clientId,
-    redirect_uri: redirectUri(),
+    redirect_uri: redirectUri(baseUrl),
     response_type: "code",
     scope: "openid email profile",
     state,
@@ -26,7 +26,7 @@ export function createGoogleAuthRequest() {
 
 export type GoogleProfile = { sub: string; email: string; emailVerified: boolean; name: string; picture?: string };
 
-export async function exchangeGoogleCode(code: string, verifier: string): Promise<GoogleProfile> {
+export async function exchangeGoogleCode(code: string, verifier: string, baseUrl?: string): Promise<GoogleProfile> {
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -34,7 +34,7 @@ export async function exchangeGoogleCode(code: string, verifier: string): Promis
       code,
       client_id: config.google.clientId,
       client_secret: config.google.clientSecret,
-      redirect_uri: redirectUri(),
+      redirect_uri: redirectUri(baseUrl),
       grant_type: "authorization_code",
       code_verifier: verifier,
     }),

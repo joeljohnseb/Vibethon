@@ -20,9 +20,25 @@ function secret(): string {
 /** Sandbox (test-mode) integrations are allowed in development, or explicitly in production. */
 const sandboxAllowed = !isProd || process.env.EBER_ALLOW_SANDBOX === "true";
 
+function getAppUrl(): string {
+  const custom = process.env.APP_URL;
+  if (custom && !custom.includes("localhost")) {
+    return custom.replace(/\/$/, "");
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`.replace(/\/$/, "");
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
+  }
+  return (custom || "http://localhost:3000").replace(/\/$/, "");
+}
+
 export const config = {
   isProd,
-  appUrl: (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, ""),
+  get appUrl() {
+    return getAppUrl();
+  },
   get secret() {
     return secret();
   },

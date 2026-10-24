@@ -23,7 +23,8 @@ export async function GET(req: Request) {
   const state = url.searchParams.get("state") ?? "";
   if (!code || !safeEqualStr(state, saved.state)) return fail("google_state");
   try {
-    const profile = await exchangeGoogleCode(code, saved.verifier);
+    const baseUrl = (saved as { baseUrl?: string }).baseUrl || url.origin;
+    const profile = await exchangeGoogleCode(code, saved.verifier, baseUrl);
     const userId = await loginWithGoogle(profile);
     await createSession(userId);
     return NextResponse.redirect(new URL(safeNext(saved.next, "/"), req.url));
