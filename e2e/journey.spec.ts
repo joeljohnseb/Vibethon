@@ -46,6 +46,11 @@ test("driver and host complete a paid charging session", async ({ browser }) => 
   await host.getByLabel("Street address").fill("7 Test Street, 4th Cross");
   await host.getByLabel("Locality / neighbourhood").fill("Jayanagar");
   await host.getByLabel("PIN code").fill("560041");
+  // Saving without placing the pin is refused.
+  await host.getByRole("button", { name: "Save & set availability" }).click();
+  await expect(host.getByText("Place the map pin on your charger's location").first()).toBeVisible();
+  await host.getByRole("button", { name: "Find address on map" }).click();
+  await expect(host.getByText(/Pin moved to/)).toBeVisible();
   await host.getByLabel("Slot length").selectOption("30");
   await host.getByLabel("Arrival & access instructions").fill("Blue gate, ring twice.");
   await shot(host, "02-host-new-listing");

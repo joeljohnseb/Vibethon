@@ -11,6 +11,11 @@ import { rupeesToPaise } from "@/lib/money";
 import { DEFAULT_TZ, isIsoDate, zonedInstant, hhmmToMinutes } from "@/lib/time";
 import { invalid } from "@/lib/errors";
 
+function requirePin(fd: FormData) {
+  if (str(fd, "pinSet") !== "1")
+    throw invalid("Place the map pin on your charger's location", { lat: "Use “Find address on map”, your current location, or tap the map to place the pin." });
+}
+
 function chargerInput(fd: FormData) {
   return {
     title: str(fd, "title"),
@@ -40,6 +45,7 @@ export async function createChargerAction(_: ActionState, fd: FormData): Promise
   let id = "";
   const res = await act(async () => {
     const u = await requireUser();
+    requirePin(fd);
     id = (await chargers.createCharger(u.id, chargerInput(fd))).id;
   });
   if (!res.ok) return res;
@@ -49,6 +55,7 @@ export async function createChargerAction(_: ActionState, fd: FormData): Promise
 export async function updateChargerAction(_: ActionState, fd: FormData) {
   return act(async () => {
     const u = await requireUser();
+    requirePin(fd);
     await chargers.updateCharger(u.id, str(fd, "chargerId"), chargerInput(fd));
     return "Listing saved. Existing bookings keep the price agreed when they were made.";
   });

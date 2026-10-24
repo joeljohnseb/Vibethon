@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useActionState, useContext, useEffect, useRef, type ReactNode } from "react";
+import { createContext, startTransition, useActionState, useContext, useEffect, useRef, type FormEvent, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import type { ActionState } from "@/lib/action";
@@ -10,6 +10,14 @@ import { cn } from "@/lib/utils";
 type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
 
 const StateCtx = createContext<ActionState>({ ok: false });
+/** Pending flag for forms submitted via ActionForm (null = not inside an ActionForm). */
+const PendingCtx = createContext<boolean | null>(null);
+/** True while the enclosing form is submitting. */
+export function useSubmitting() {
+  const ctx = useContext(PendingCtx);
+  const { pending } = useFormStatus();
+  return ctx ?? pending;
+}
 export const useFormState = () => useContext(StateCtx);
 export const useFieldError = (name: string) => useContext(StateCtx).fieldErrors?.[name];
 
@@ -31,7 +39,7 @@ export function ActionForm({
   showMessage?: boolean;
   id?: string;
 }) {
-  const [state, formAction] = useActionState(action, { ok: false });
+  const [state, formAction, pending] = useActionState(action, { ok: false });
   const ref = useRef<HTMLFormElement>(null);
   const cb = useRef(onSuccess);
   useEffect(() => {
@@ -43,12 +51,23 @@ export function ActionForm({
       cb.current?.(state);
     }
   }, [state, resetOnSuccess]);
+  // Submit manually rather than via <form action>, so React doesn't reset the
+  // user's input when the server returns a validation error.
+  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (pending) return;
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
+    const fd = new FormData(e.currentTarget, submitter);
+    startTransition(() => formAction(fd));
+  };
   return (
     <StateCtx value={state}>
-      <form ref={ref} action={formAction} className={className} id={id} noValidate>
-        {children}
-        {showMessage && <FormMessage />}
-      </form>
+      <PendingCtx value={pending}>
+        <form ref={ref} onSubmit={onSubmit} className={className} id={id} noValidate>
+          {children}
+          {showMessage && <FormMessage />}
+        </form>
+      </PendingCtx>
     </StateCtx>
   );
 }
@@ -92,7 +111,7 @@ export function SubmitButton({
   value?: string;
   disabled?: boolean;
 }) {
-  const { pending } = useFormStatus();
+  const pending = useSubmitting();
   return (
     <button type="submit" name={name} value={value} disabled={pending || disabled} className={cn(buttonClass(variant, size, full), className)}>
       {pending ? (

@@ -2,8 +2,8 @@
  * Image storage. Uploads are validated by magic bytes, decoded and re-encoded
  * with sharp (which strips EXIF — including GPS coordinates — and neutralises
  * malformed/polyglot files), resized, and written under STORAGE_DIR with a
- * random key. Swap `writeObject`/`readObject` for S3/R2/Supabase Storage in
- * production; nothing else depends on the filesystem.
+ * random key. When BLOB_READ_WRITE_TOKEN is set (Vercel), images go to Vercel
+ * Blob instead and the stored key is the public blob URL.
  */
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -40,6 +40,11 @@ export async function storeImage(buf: Buffer) {
   } catch {
     throw new UploadError("That image couldn't be read");
   }
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import("@vercel/blob");
+    const blob = await put(`chargers/${randomUUID()}.webp`, out.data, { access: "public", contentType: "image/webp" });
+    return { key: blob.url, contentType: "image/webp", width: out.info.width, height: out.info.height };
+  }
   const key = `${randomUUID()}.webp`;
   await mkdir(storageDir(), { recursive: true });
   await writeFile(path.join(storageDir(), key), out.data);
@@ -56,8 +61,13 @@ export async function readStoredFile(key: string): Promise<Buffer | null> {
 }
 
 export async function deleteStoredFile(key: string) {
+  if (key.startsWith("https://") && process.env.BLOB_READ_WRITE_TOKEN) {
+    const { del } = await import("@vercel/blob");
+    await del(key).catch(() => {});
+    return;
+  }
   if (!KEY_RE.test(key)) return;
   await unlink(path.join(storageDir(), key)).catch(() => {});
 }
 
-export const photoUrl = (key: string) => `/api/files/${key}`;
+export const photoUrl = (key: string) => (key.startsWith("https://") ? key : `/api/files/${key}`);

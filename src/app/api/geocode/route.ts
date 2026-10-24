@@ -4,9 +4,10 @@ import { rateLimit } from "@/lib/ratelimit";
 
 /** Location search: city presets first, then OpenStreetMap Nominatim (India only). */
 export async function GET(req: Request) {
-  const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
+  const params = new URL(req.url).searchParams;
+  const q = params.get("q")?.trim() ?? "";
   if (q.length < 2) return NextResponse.json({ results: [] });
-  const presets = CITY_PRESETS.filter((c) => c.name.toLowerCase().startsWith(q.toLowerCase())).map((c) => ({ label: c.name, lat: c.lat, lng: c.lng }));
+  const presets = params.get("presets") === "0" ? [] : CITY_PRESETS.filter((c) => c.name.toLowerCase().startsWith(q.toLowerCase())).map((c) => ({ label: c.name, lat: c.lat, lng: c.lng }));
   try {
     rateLimit(`geocode:${req.headers.get("x-forwarded-for") ?? "local"}`, 30, 60_000);
     const url = new URL("https://nominatim.openstreetmap.org/search");

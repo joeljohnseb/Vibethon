@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Crosshair } from "lucide-react";
+import { Crosshair, MapPin } from "lucide-react";
 import { ActionForm, FieldError, SubmitButton, useFormState } from "./action-form";
 import { Card, inputClass } from "./ui";
 import { PinPicker } from "./maps";
@@ -62,22 +62,62 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 }
 
 export function ChargerForm({ initial }: { initial: ChargerFormValues }) {
-  const [pos, setPos] = useState({ lat: initial.lat, lng: initial.lng });
-  const [geo, setGeo] = useState<string | null>(null);
   const isEdit = Boolean(initial.id);
+  const [pos, setPos] = useState({ lat: initial.lat, lng: initial.lng });
+  // Where the pin came from. A new listing starts at a placeholder ("default") and can't be saved until placed.
+  const [pinSource, setPinSource] = useState<"default" | "saved" | "address" | "gps" | "manual">(isEdit ? "saved" : "default");
+  const [geo, setGeo] = useState<{ tone: "muted" | "warn" | "volt"; text: string } | null>(null);
   const t = (k: keyof ChargerFormValues) => String(initial[k] ?? "");
 
+  const place = (lat: number, lng: number, source: typeof pinSource) => {
+    setPos({ lat, lng });
+    setPinSource(source);
+  };
+
   const locate = () => {
-    if (!navigator.geolocation) return setGeo("Location isn't available in this browser");
-    setGeo("Locating…");
+    if (!navigator.geolocation) return setGeo({ tone: "warn", text: "Location isn't available in this browser — find your address instead" });
+    setGeo({ tone: "muted", text: "Locating…" });
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        setPos({ lat: p.coords.latitude, lng: p.coords.longitude });
-        setGeo(null);
+        place(p.coords.latitude, p.coords.longitude, "gps");
+        setGeo({ tone: "volt", text: "Pin set to your current location. Drag it if the charger is elsewhere." });
       },
-      () => setGeo("Couldn't get your location — drag the pin instead"),
+      () => setGeo({ tone: "warn", text: "Couldn't get your location — find your address or drag the pin instead" }),
       { enableHighAccuracy: true, timeout: 10000 },
     );
+  };
+
+  /** Look up the typed address and move the pin there (most specific match first). */
+  const findAddress = async (auto = false) => {
+    if (auto && (pinSource === "manual" || pinSource === "gps" || pinSource === "saved")) return;
+    const v = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value.trim() ?? "";
+    const [line, loc, city, state, pin] = ["addressLine", "locality", "city", "state", "postalCode"].map(v);
+    const queries = [
+      [line, loc, city, state, pin],
+      [line, city, state],
+      [loc, city, state, pin],
+      [loc, city, state],
+      [pin],
+      [city, state],
+    ]
+      .map((q) => q.filter(Boolean).join(", "))
+      .filter((q, i, all) => q.length > 2 && all.indexOf(q) === i);
+    if (!queries.length) return !auto && setGeo({ tone: "warn", text: "Enter the address first." });
+    setGeo({ tone: "muted", text: "Finding your address…" });
+    for (const q of queries) {
+      try {
+        const res = await fetch(`/api/geocode?presets=0&q=${encodeURIComponent(q)}`);
+        const data = (await res.json()) as { results: { lat: number; lng: number; label: string }[] };
+        if (data.results[0]) {
+          place(data.results[0].lat, data.results[0].lng, "address");
+          setGeo({ tone: "volt", text: `Pin moved to “${data.results[0].label}”. Drag it onto the exact charger spot if needed.` });
+          return;
+        }
+      } catch {
+        break;
+      }
+    }
+    setGeo({ tone: "warn", text: "We couldn't find that address on the map. Drag the pin to your charger or use your location." });
   };
 
   return (
@@ -85,6 +125,7 @@ export function ChargerForm({ initial }: { initial: ChargerFormValues }) {
       {isEdit && <input type="hidden" name="chargerId" value={initial.id} />}
       <input type="hidden" name="lat" value={pos.lat.toFixed(6)} />
       <input type="hidden" name="lng" value={pos.lng.toFixed(6)} />
+      <input type="hidden" name="pinSet" value={pinSource === "default" ? "" : "1"} />
 
       <Section title="Basics" subtitle="What drivers see first in search.">
         <F name="title" label="Listing title" hint="e.g. “Covered driveway charger, 7.4 kW”">
@@ -125,31 +166,40 @@ export function ChargerForm({ initial }: { initial: ChargerFormValues }) {
         </div>
       </Section>
 
-      <Section title="Location" subtitle="Your exact address is private. Drivers see an approximate area until their booking is confirmed.">
-        <div className="relative h-72 overflow-hidden rounded-xl border border-line">
-          <PinPicker lat={pos.lat} lng={pos.lng} onPick={(lat, lng) => setPos({ lat, lng })} />
-          <button type="button" onClick={locate} className="absolute right-3 top-3 z-[500] flex items-center gap-1.5 rounded-lg bg-surface-2/95 px-3 py-2 text-sm font-medium shadow-lg hover:text-volt">
-            <Crosshair size={15} /> Use my location
-          </button>
-        </div>
-        <p className="text-xs text-faint">{geo ?? "Tap the map or drag the pin to the charger's exact spot."} ({pos.lat.toFixed(5)}, {pos.lng.toFixed(5)})</p>
+      <Section title="Location" subtitle="Your exact address is private. Drivers see an approximate area until their booking is confirmed, then get directions to this pin.">
         <F name="addressLine" label="Street address">
-          <input id="addressLine" name="addressLine" defaultValue={t("addressLine")} autoComplete="street-address" className={inputClass} />
+          <input id="addressLine" name="addressLine" defaultValue={t("addressLine")} autoComplete="street-address" onBlur={() => findAddress(true)} className={inputClass} />
         </F>
         <div className="grid gap-4 sm:grid-cols-2">
           <F name="locality" label="Locality / neighbourhood" hint="Shown publicly">
-            <input id="locality" name="locality" defaultValue={t("locality")} className={inputClass} />
+            <input id="locality" name="locality" defaultValue={t("locality")} onBlur={() => findAddress(true)} className={inputClass} />
           </F>
           <F name="city" label="City">
-            <input id="city" name="city" defaultValue={t("city")} autoComplete="address-level2" className={inputClass} />
+            <input id="city" name="city" defaultValue={t("city")} autoComplete="address-level2" onBlur={() => findAddress(true)} className={inputClass} />
           </F>
           <F name="state" label="State">
-            <input id="state" name="state" defaultValue={t("state")} autoComplete="address-level1" className={inputClass} />
+            <input id="state" name="state" defaultValue={t("state")} autoComplete="address-level1" onBlur={() => findAddress(true)} className={inputClass} />
           </F>
           <F name="postalCode" label="PIN code">
-            <input id="postalCode" name="postalCode" defaultValue={t("postalCode")} inputMode="numeric" maxLength={6} autoComplete="postal-code" className={inputClass} />
+            <input id="postalCode" name="postalCode" defaultValue={t("postalCode")} inputMode="numeric" maxLength={6} autoComplete="postal-code" onBlur={() => findAddress(true)} className={inputClass} />
           </F>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => findAddress(false)} className="flex h-10 items-center gap-1.5 rounded-xl border border-line-strong px-3 text-sm font-medium hover:border-volt hover:text-volt">
+            <MapPin size={15} /> Find address on map
+          </button>
+          <button type="button" onClick={locate} className="flex h-10 items-center gap-1.5 rounded-xl border border-line-strong px-3 text-sm font-medium hover:border-volt hover:text-volt">
+            <Crosshair size={15} /> I&apos;m at the charger — use my location
+          </button>
+        </div>
+        <div className={cn("relative h-72 overflow-hidden rounded-xl border", pinSource === "default" ? "border-warn/60" : "border-line")}>
+          <PinPicker lat={pos.lat} lng={pos.lng} onPick={(lat, lng) => place(lat, lng, "manual")} />
+        </div>
+        <p className={cn("text-xs", geo?.tone === "warn" || (!geo && pinSource === "default") ? "text-warn" : geo?.tone === "volt" ? "text-volt" : "text-faint")}>
+          {geo?.text ?? (pinSource === "default" ? "Place the pin on your charger: find your address, use your location, or tap the map." : "Drag the pin or tap the map to fine-tune the charger's exact spot.")}{" "}
+          <span className="text-faint">({pos.lat.toFixed(5)}, {pos.lng.toFixed(5)})</span>
+        </p>
+        <FieldError name="lat" />
       </Section>
 
       <Section title="Parking, access & safety">

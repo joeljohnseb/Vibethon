@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { buttonClass } from "./ui";
+import { useSubmitting } from "./action-form";
 
 /** Two-step submit button: first click asks for confirmation inline. */
 export function ConfirmButton({
@@ -22,7 +22,7 @@ export function ConfirmButton({
   full?: boolean;
 }) {
   const [asking, setAsking] = useState(false);
-  const { pending } = useFormStatus();
+  const pending = useSubmitting();
   if (!asking)
     return (
       <button type="button" onClick={() => setAsking(true)} className={buttonClass(variant === "primary" ? "primary" : variant === "secondary" ? "secondary" : "danger", size, full)}>
