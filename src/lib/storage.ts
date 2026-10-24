@@ -13,7 +13,7 @@ export const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
 const KEY_RE = /^[0-9a-f-]{36}\.webp$/;
 
 function storageDir() {
-  return path.resolve(process.env.STORAGE_DIR || "./.data/uploads");
+  return path.resolve(process.env.STORAGE_DIR || (process.env.VERCEL ? "/tmp/uploads" : "./.data/uploads"));
 }
 
 function sniff(buf: Buffer): "jpeg" | "png" | "webp" | null {
