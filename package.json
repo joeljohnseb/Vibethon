@@ -1,0 +1,53 @@
+{
+  "name": "eber",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run db:migrate --silent && next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "node --conditions=react-server --import tsx scripts/seed.ts",
+    "db:reset": "npm run db:migrate --silent && node --conditions=react-server --import tsx scripts/seed.ts --force",
+    "setup": "npm run db:migrate && npm run db:seed",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.11",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "date-fns-tz": "^3.2.0",
+    "drizzle-orm": "^0.45.4",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.61.0",
+    "next": "16.4.3",
+    "pg": "^8.23.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-leaflet": "^5.0.0",
+    "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@tailwindcss/turbopack": "^4",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^18.0.9",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.3",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
+  }
+}

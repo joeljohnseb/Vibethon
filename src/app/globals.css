@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0c0b;
+  --color-surface: #111413;
+  --color-surface-2: #171b19;
+  --color-surface-3: #1e2321;
+  --color-line: #262c29;
+  --color-line-strong: #343c38;
+  --color-ink: #f3f6f4;
+  --color-muted: #a1aaa5;
+  --color-faint: #6c7570;
+  --color-volt: #2ee88a;
+  --color-volt-bright: #5ef5a6;
+  --color-volt-deep: #0f3d26;
+  --color-volt-ink: #03140b;
+  --color-danger: #ff6b6b;
+  --color-warn: #ffbf47;
+  --color-info: #62b0ff;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-volt) 35%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-volt);
+  outline-offset: 2px;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+/* Leaflet dark adjustments */
+.leaflet-container {
+  background: #0d100f;
+  font-family: var(--font-sans);
+}
+.leaflet-control-attribution {
+  background: rgba(10, 12, 11, 0.75) !important;
+  color: var(--color-faint) !important;
+  font-size: 10px;
+}
+.leaflet-control-attribution a {
+  color: var(--color-muted) !important;
+}
+.leaflet-bar a {
+  background: var(--color-surface-2) !important;
+  color: var(--color-ink) !important;
+  border-color: var(--color-line) !important;
+}
+/* Dark basemap from standard OSM tiles */
+.eber-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.4);
+}
+.eber-pin {
+  background: transparent;
+  border: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: white;
+    color: black;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
